@@ -6,7 +6,8 @@ import { logger } from '../../utils/logger.js';
 import { getPathModeProjectContext, getProjectContext } from '../../utils/project-name.js';
 import { ChromaSync, MergedIntoProjectTarget } from '../sync/ChromaSync.js';
 import { emitRemapProject, hasSyncLane } from '../sync/remap-outbox.js';
-import { paths } from '../../shared/paths.js';
+import { paths, USER_SETTINGS_PATH } from '../../shared/paths.js';
+import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js';
 import { openConfiguredSqliteDatabase } from '../sqlite/connection.js';
 
 const DEFAULT_DATA_DIR = paths.dataDir();
@@ -551,7 +552,11 @@ export async function adoptMergedWorktrees(opts: {
     db?.close();
   }
 
-  if (!dryRun && adoptedChromaTargets.length > 0) {
+  // The SQLite adoption above always runs. The Chroma patch is skipped when the
+  // user turned Chroma off: constructing ChromaSync spawns chroma-mcp (#4563).
+  const chromaEnabled =
+    SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH).CLAUDE_MEM_CHROMA_ENABLED !== 'false';
+  if (!dryRun && adoptedChromaTargets.length > 0 && chromaEnabled) {
     const chromaSync = new ChromaSync('claude-mem');
     try {
       await chromaSync.updateMergedIntoProject(adoptedChromaTargets, parentProject);
